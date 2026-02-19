@@ -3,6 +3,7 @@ import 'server-only';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AccountSettings, Cashflow } from '@/types/order';
 
 export type OrderRow = {
   id: string;
@@ -27,6 +28,8 @@ export type OrderRow = {
 
 type DbShape = {
   orders: OrderRow[];
+  cashflows: Cashflow[];
+  settings: AccountSettings;
   meta: {
     version: number;
     lastImportAt: string | null;
@@ -39,7 +42,13 @@ const dbPath = path.join(dataDir, 'orders.json');
 function defaultDb(): DbShape {
   return {
     orders: [],
-    meta: { version: 1, lastImportAt: null },
+    cashflows: [],
+    settings: {
+      initialEquity: 10000,
+      riskFreeRateAnnual: 0,
+      tradingDaysPerYear: 252,
+    },
+    meta: { version: 2, lastImportAt: null },
   };
 }
 
@@ -53,8 +62,20 @@ export function readDb(): DbShape {
   const raw = fs.readFileSync(dbPath, 'utf8');
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.orders) || !parsed.meta) return defaultDb();
-    return parsed as DbShape;
+    const d = defaultDb();
+    return {
+      orders: Array.isArray(parsed?.orders) ? parsed.orders : d.orders,
+      cashflows: Array.isArray(parsed?.cashflows) ? parsed.cashflows : d.cashflows,
+      settings: {
+        initialEquity: Number(parsed?.settings?.initialEquity ?? d.settings.initialEquity),
+        riskFreeRateAnnual: Number(parsed?.settings?.riskFreeRateAnnual ?? d.settings.riskFreeRateAnnual),
+        tradingDaysPerYear: Number(parsed?.settings?.tradingDaysPerYear ?? d.settings.tradingDaysPerYear),
+      },
+      meta: {
+        version: Number(parsed?.meta?.version ?? d.meta.version),
+        lastImportAt: parsed?.meta?.lastImportAt ?? d.meta.lastImportAt,
+      },
+    };
   } catch {
     return defaultDb();
   }

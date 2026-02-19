@@ -1,5 +1,6 @@
--- v1.1 改为 JSON 文件数据库（data/orders.json），不再使用 SQL/WASM
--- 订单结构字段：
--- id, symbol, side, orderType, volume, filledVolume, limitPrice, stopLossPrice,
--- avgFillPrice, status, updatedAtText, parsedUpdatedAt, profit, grossProfit,
--- swap, commission, orderId, importedAt
+-- v1.2 采用 JSON 文件数据库（data/orders.json）
+-- orders: id,symbol,side,orderType,volume,filledVolume,limitPrice,stopLossPrice,
+--         avgFillPrice,status,updatedAtText,parsedUpdatedAt,profit,grossProfit,
+--         swap,commission,orderId,importedAt
+-- cashflows: id,dateTime,amount,note,createdAt
+-- settings: initialEquity,riskFreeRateAnnual,tradingDaysPerYear

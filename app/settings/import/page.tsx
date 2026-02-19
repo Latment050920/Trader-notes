@@ -31,14 +31,19 @@ export default function ImportPage() {
       const msg = e instanceof Error ? e.message : String(e);
       setErrorText(msg);
       try {
-        console.log('import error', JSON.parse(msg));
+        console.log('导入错误详情', JSON.parse(msg));
       } catch {
-        console.log('import error', msg);
+        console.log('导入错误详情', msg);
       }
     }
   };
 
   return <MotionLayout><div className="space-y-4">
+    <GlassCard className="space-y-2 p-4">
+      <h2 className="font-semibold">设置入口</h2>
+      <p className="text-sm text-muted">账户参数与资金流水管理已迁移到首页「账户参数」模块。</p>
+    </GlassCard>
+
     <GlassCard className="space-y-3 p-4">
       <h2 className="font-semibold">Pepperstone 订单历史 CSV 导入</h2>
       <input className="input" type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] || null)} />

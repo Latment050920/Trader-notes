@@ -27,3 +27,17 @@ export type ImportErrorRow = {
   reason: string;
   raw: Record<string, string>;
 };
+
+export type Cashflow = {
+  id: string;
+  dateTime: string;
+  amount: number;
+  note?: string;
+  createdAt: string;
+};
+
+export type AccountSettings = {
+  initialEquity: number;
+  riskFreeRateAnnual: number;
+  tradingDaysPerYear: number;
+};
