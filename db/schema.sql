@@ -1,0 +1,6 @@
+-- v1.2 采用 JSON 文件数据库（data/orders.json）
+-- orders: id,symbol,side,orderType,volume,filledVolume,limitPrice,stopLossPrice,
+--         avgFillPrice,status,updatedAtText,parsedUpdatedAt,profit,grossProfit,
+--         swap,commission,orderId,importedAt
+-- cashflows: id,dateTime,amount,note,createdAt
+-- settings: initialEquity,riskFreeRateAnnual,tradingDaysPerYear
