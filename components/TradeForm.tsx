@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { assetClasses, optionTypes, sides, strategyTags } from '@/lib/constants';
 import { Trade } from '@/types/trade';
+import { Segmented } from '@/components/ui/Segmented';
+import { GlassCard } from '@/components/ui/GlassCard';
 
 type Props = { initial?: Trade };
 
@@ -18,6 +21,7 @@ const empty = {
 
 export function TradeForm({ initial }: Props) {
   const router = useRouter();
+  const reduced = useReducedMotion();
   const [advanced, setAdvanced] = useState(false);
   const [form, setForm] = useState<any>(initial ? {
     ...initial,
@@ -89,41 +93,65 @@ export function TradeForm({ initial }: Props) {
     };
     const method = initial ? 'PUT' : 'POST';
     const url = initial ? `/api/trades/${initial.id}` : '/api/trades';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    router.push('/trades');
-    router.refresh();
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) {
+      router.push('/trades');
+      router.refresh();
+    }
   };
 
-  return <form onSubmit={submit} className="card space-y-4 p-5">
-    <div className="flex flex-wrap gap-2 rounded-xl bg-slate-100 p-1">{assetClasses.map((v)=><button type="button" key={v} className={`btn ${form.assetClass===v?'bg-white shadow':'text-slate-500'}`} onClick={()=>update('assetClass',v)}>{v}</button>)}</div>
-    <div className="grid gap-3 md:grid-cols-3">
-      <input className="input" placeholder="symbol" value={form.symbol} onChange={(e)=>update('symbol',e.target.value)} required/>
-      <select className="input" value={form.side} onChange={(e)=>update('side',e.target.value)}>{sides.map(v=><option key={v}>{v}</option>)}</select>
-      <input className="input" type="datetime-local" value={form.entryTime} onChange={(e)=>update('entryTime',e.target.value)} required/>
-      <input className="input" type="datetime-local" value={form.closeTime || ''} onChange={(e)=>update('closeTime',e.target.value)} />
-      <input className="input" placeholder="entryPrice" value={form.entryPrice} onChange={(e)=>update('entryPrice',e.target.value)} />
-      <input className="input" placeholder="stopLoss" value={form.stopLoss} onChange={(e)=>update('stopLoss',e.target.value)} />
-      <input className="input" placeholder="closePrice" value={form.closePrice} onChange={(e)=>update('closePrice',e.target.value)} />
-      <input className="input" placeholder="qty" value={form.qty} onChange={(e)=>update('qty',e.target.value)} />
-      <input className="input" placeholder="notional" value={form.notional} onChange={(e)=>update('notional',e.target.value)} />
-    </div>
-    <div className="grid gap-2 md:grid-cols-2">{extraFields}</div>
+  return <motion.form onSubmit={submit} className="space-y-4" initial={reduced ? false : {opacity:0,y:8}} animate={reduced ? {} : {opacity:1,y:0}}>
+    <GlassCard className="p-4">
+      <Segmented options={[...assetClasses]} value={form.assetClass} onChange={(v)=>update('assetClass',v)} />
+    </GlassCard>
 
-    <div>
-      <div className="mb-2 flex items-center justify-between"><p className="label">Take Profits</p><button className="btn-secondary" type="button" onClick={()=>update('takeProfits',[...form.takeProfits,{price:'',label:`tp${form.takeProfits.length+1}`}])}>+ Add</button></div>
-      {form.takeProfits.map((tp:any,idx:number)=><div key={idx} className="mb-2 grid grid-cols-2 gap-2"><input className="input" placeholder="price" value={tp.price} onChange={(e)=>{const n=[...form.takeProfits];n[idx].price=e.target.value;update('takeProfits',n)}}/><input className="input" placeholder="label" value={tp.label} onChange={(e)=>{const n=[...form.takeProfits];n[idx].label=e.target.value;update('takeProfits',n)}}/></div>)}
-    </div>
+    <GlassCard className="space-y-4 p-5">
+      <h3 className="text-sm font-semibold text-cyan-300">通用字段</h3>
+      <div className="grid gap-3 md:grid-cols-3">
+        <input className="input" placeholder="symbol" value={form.symbol} onChange={(e)=>update('symbol',e.target.value)} required/>
+        <select className="input" value={form.side} onChange={(e)=>update('side',e.target.value)}>{sides.map(v=><option key={v}>{v}</option>)}</select>
+        <input className="input" type="datetime-local" value={form.entryTime} onChange={(e)=>update('entryTime',e.target.value)} required/>
+        <input className="input" type="datetime-local" value={form.closeTime || ''} onChange={(e)=>update('closeTime',e.target.value)} />
+        <input className="input" placeholder="entryPrice" value={form.entryPrice} onChange={(e)=>update('entryPrice',e.target.value)} />
+        <input className="input" placeholder="stopLoss" value={form.stopLoss} onChange={(e)=>update('stopLoss',e.target.value)} />
+        <input className="input" placeholder="closePrice" value={form.closePrice} onChange={(e)=>update('closePrice',e.target.value)} />
+        <input className="input" placeholder="qty" value={form.qty} onChange={(e)=>update('qty',e.target.value)} />
+        <input className="input" placeholder="notional" value={form.notional} onChange={(e)=>update('notional',e.target.value)} />
+      </div>
+    </GlassCard>
 
-    <div>
-      <div className="mb-2 flex items-center justify-between"><p className="label">Partial Exits</p><button className="btn-secondary" type="button" onClick={()=>update('partialExits',[...form.partialExits,{price:'',qtyPercent:'',time:''}])}>+ Add</button></div>
-      {form.partialExits.map((p:any,idx:number)=><div key={idx} className="mb-2 grid grid-cols-3 gap-2"><input className="input" placeholder="price" value={p.price} onChange={(e)=>{const n=[...form.partialExits];n[idx].price=e.target.value;update('partialExits',n)}}/><input className="input" placeholder="qtyPercent" value={p.qtyPercent} onChange={(e)=>{const n=[...form.partialExits];n[idx].qtyPercent=e.target.value;update('partialExits',n)}}/><input className="input" type="datetime-local" value={p.time || ''} onChange={(e)=>{const n=[...form.partialExits];n[idx].time=e.target.value;update('partialExits',n)}}/></div>)}
-    </div>
+    <GlassCard className="space-y-3 p-5">
+      <h3 className="text-sm font-semibold text-cyan-300">资产专属字段</h3>
+      <div className="grid gap-2 md:grid-cols-2">{extraFields}</div>
+    </GlassCard>
 
-    <div className="space-y-2"><button type="button" className="btn-secondary" onClick={()=>setAdvanced(!advanced)}>Advanced</button>{advanced && <div className="grid gap-2 md:grid-cols-2"><input className="input" placeholder="fee" value={form.fee} onChange={(e)=>update('fee',e.target.value)}/><input className="input" placeholder="slippage" value={form.slippage} onChange={(e)=>update('slippage',e.target.value)}/></div>}</div>
+    <GlassCard className="space-y-4 p-5">
+      <div>
+        <div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold">Take Profits</p><button className="btn-secondary" type="button" onClick={()=>update('takeProfits',[...form.takeProfits,{price:'',label:`tp${form.takeProfits.length+1}`}])}>+ Add</button></div>
+        <AnimatePresence>
+          {form.takeProfits.map((tp:any,idx:number)=><motion.div key={idx} initial={reduced?false:{opacity:0,y:4}} animate={reduced?{}:{opacity:1,y:0}} exit={reduced?{}:{opacity:0,y:-4}} className="mb-2 grid grid-cols-2 gap-2"><input className="input" placeholder="price" value={tp.price} onChange={(e)=>{const n=[...form.takeProfits];n[idx].price=e.target.value;update('takeProfits',n)}}/><input className="input" placeholder="label" value={tp.label} onChange={(e)=>{const n=[...form.takeProfits];n[idx].label=e.target.value;update('takeProfits',n)}}/></motion.div>)}
+        </AnimatePresence>
+      </div>
 
-    <textarea className="input min-h-24" placeholder="notes markdown" value={form.notes} onChange={(e)=>update('notes',e.target.value)} />
-    <input className="input" placeholder="tags,comma,separated" value={form.tags} onChange={(e)=>update('tags',e.target.value)} />
-    <div className="space-y-2"><div className="flex items-center justify-between"><p className="label">Price Series JSON</p><button type="button" className="btn-secondary" onClick={sampleSeries}>Generate Demo Series</button></div><textarea className="input min-h-36 font-mono text-xs" value={form.priceSeriesText} onChange={(e)=>update('priceSeriesText',e.target.value)} /></div>
-    <button className="btn-primary" type="submit">Save Trade</button>
-  </form>;
+      <div>
+        <div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold">Partial Exits</p><button className="btn-secondary" type="button" onClick={()=>update('partialExits',[...form.partialExits,{price:'',qtyPercent:'',time:''}])}>+ Add</button></div>
+        <AnimatePresence>
+          {form.partialExits.map((p:any,idx:number)=><motion.div key={idx} initial={reduced?false:{opacity:0,y:4}} animate={reduced?{}:{opacity:1,y:0}} exit={reduced?{}:{opacity:0,y:-4}} className="mb-2 grid grid-cols-3 gap-2"><input className="input" placeholder="price" value={p.price} onChange={(e)=>{const n=[...form.partialExits];n[idx].price=e.target.value;update('partialExits',n)}}/><input className="input" placeholder="qtyPercent" value={p.qtyPercent} onChange={(e)=>{const n=[...form.partialExits];n[idx].qtyPercent=e.target.value;update('partialExits',n)}}/><input className="input" type="datetime-local" value={p.time || ''} onChange={(e)=>{const n=[...form.partialExits];n[idx].time=e.target.value;update('partialExits',n)}}/></motion.div>)}
+        </AnimatePresence>
+      </div>
+
+      <div className="space-y-2"><button type="button" className="btn-secondary" onClick={()=>setAdvanced(!advanced)}>Advanced</button>
+        <AnimatePresence>
+          {advanced && <motion.div initial={reduced?false:{height:0,opacity:0}} animate={reduced?{}:{height:'auto',opacity:1}} exit={reduced?{}:{height:0,opacity:0}} className="grid gap-2 overflow-hidden md:grid-cols-2"><input className="input" placeholder="fee" value={form.fee} onChange={(e)=>update('fee',e.target.value)}/><input className="input" placeholder="slippage" value={form.slippage} onChange={(e)=>update('slippage',e.target.value)}/></motion.div>}
+        </AnimatePresence>
+      </div>
+    </GlassCard>
+
+    <GlassCard className="space-y-2 p-5">
+      <textarea className="input min-h-24" placeholder="notes markdown" value={form.notes} onChange={(e)=>update('notes',e.target.value)} />
+      <input className="input" placeholder="tags,comma,separated" value={form.tags} onChange={(e)=>update('tags',e.target.value)} />
+      <div className="space-y-2"><div className="flex items-center justify-between"><p className="text-sm">Price Series JSON</p><button type="button" className="btn-secondary" onClick={sampleSeries}>Generate Demo Series</button></div><textarea className="input min-h-36 font-mono text-xs" value={form.priceSeriesText} onChange={(e)=>update('priceSeriesText',e.target.value)} /></div>
+      <button className="btn-primary" type="submit">Save Trade</button>
+    </GlassCard>
+  </motion.form>;
 }

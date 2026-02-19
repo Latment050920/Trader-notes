@@ -5,6 +5,16 @@
 ## 为什么移除 better-sqlite3
 原方案依赖原生绑定，在 Windows 上经常触发 `bindings file not found`、node-gyp/VS Build Tools 等编译问题。当前改为 **sql.js（纯 WASM）**，不需要 C++ 编译链，`pnpm install` 后可直接运行。
 
+## 本次 UI/UX 升级
+- 默认深色高级金融终端风（支持 Light/Dark/System）
+- Glassmorphism 毛玻璃卡片、背景光晕、细噪点纹理
+- Framer Motion 页面/卡片/列表微交互与过渡动画
+- Dashboard 重构：KPI、Performance 面板、Recent Trades、Insights
+- Trades 重构：搜索、asset segmented、side toggle、移动端卡片列表
+- 详情页重构：交易摘要条、左右分栏、指标卡 stagger 动画
+- 设置页新增 AI mock 调用入口
+- `prefers-reduced-motion` 自动降级动画
+
 ## 功能（v1.0）
 - 多资产交易 CRUD（含资产类型切换 + 通用字段 + 专属字段）
 - 动态止盈/部分止盈录入
@@ -23,6 +33,7 @@
 ## 技术栈
 - Next.js App Router + TypeScript + TailwindCSS
 - SQL.js (`sql.js`) + 文件落盘
+- Framer Motion + lucide-react + next-themes
 - TradingView Lightweight Charts
 
 ## 运行环境
@@ -66,8 +77,8 @@ pnpm db:seed
 ## 目录
 - `lib/storage/db.ts`：sql.js 初始化、建表、加载/落盘
 - `lib/storage/persistence.ts`：文件读写与写入队列
+- `components/ui/*`：玻璃卡、统计卡、分段控件、骨架屏、动效布局
 - `app/api/**`：所有 DB 访问入口（页面仅 fetch API）
-- `components/`、`charts/`、`lib/metrics.ts`
 
 ## 替换 AI 接口（未来）
 将 `app/api/ai/review/route.ts` 中 mock 替换为实际模型调用，保持请求体结构包含：
