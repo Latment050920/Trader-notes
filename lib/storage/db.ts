@@ -1,9 +1,22 @@
-import path from 'path';
-import initSqlJs, { Database, SqlJsStatic } from 'sql.js';
+import 'server-only';
+
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
 import { queueWriteDbFile, readDbFile } from './persistence';
 
+const require = createRequire(import.meta.url);
+
+type SqlJsStatic = {
+  Database: new (data?: Uint8Array) => any;
+};
+
+class SqlJsLoadError extends Error {
+  code = 'SQLJS_LOAD_FAILED';
+  hint = 'Use nodejs runtime and load sql-wasm.cjs';
+}
+
 let SQL: SqlJsStatic | null = null;
-let db: Database | null = null;
+let db: any | null = null;
 
 const schemaSql = `
 CREATE TABLE IF NOT EXISTS history_orders (
@@ -31,8 +44,18 @@ CREATE TABLE IF NOT EXISTS history_orders (
 
 async function ensureSql() {
   if (SQL) return SQL;
-  SQL = await initSqlJs({ locateFile: () => path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm') });
-  return SQL;
+  try {
+    const initSqlJs = require('sql.js/dist/sql-wasm.cjs');
+    const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
+    const wasmBinary = fs.readFileSync(wasmPath);
+    SQL = await initSqlJs({ wasmBinary });
+    return SQL;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const e = new SqlJsLoadError(`Failed loading sql.js: ${message}`);
+    (e as any).cause = err;
+    throw e;
+  }
 }
 
 export async function getDb() {
