@@ -12,10 +12,8 @@ export async function GET() {
       {
         ok: false,
         error: {
+          code: (err as any)?.code || 'DASHBOARD_SUMMARY_FAILED',
           message,
-          code: (err as any)?.code,
-          hint: (err as any)?.hint,
-          name: (err as any)?.name,
           stack: process.env.NODE_ENV !== 'production' ? (err as any)?.stack : undefined,
         },
       },

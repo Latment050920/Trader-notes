@@ -1,8 +1,4 @@
-import { getDb, persistDb } from '../lib/storage/db';
+import { ensureDbFile } from '../lib/storage/jsondb';
 
-async function main() {
-  await getDb();
-  await persistDb();
-  console.log('Database initialized at data/trader-notes.sqlite');
-}
-main();
+ensureDbFile();
+console.log('数据库初始化完成: data/orders.json');

@@ -2,7 +2,7 @@ import { importOrders } from '../lib/db';
 
 async function main() {
   const now = Date.now();
-  const rows = Array.from({ length: 12 }).map((_, i) => ({
+  const rows = Array.from({ length: 20 }).map((_, i) => ({
     symbol: i % 2 ? 'XAUUSD' : 'EURUSD',
     side: i % 2 ? '买入' : '卖出',
     orderType: '市价',
@@ -20,7 +20,9 @@ async function main() {
     commission: -1.2,
     orderId: `SEED-${i}`,
   }));
-  const r = await importOrders(rows, 'skip', false);
-  console.log('Seed done', r);
+
+  const res = await importOrders(rows, 'skip', false);
+  console.log('seed结果', res);
 }
+
 main();

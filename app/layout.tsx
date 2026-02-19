@@ -15,8 +15,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <nav className="flex flex-wrap gap-2">
                 <Link href="/" className="btn-secondary"><BarChart3 className="h-4 w-4" /> 数据看板</Link>
                 <Link href="/orders" className="btn-secondary"><TableProperties className="h-4 w-4" /> 订单列表</Link>
-                <Link href="/settings/import" className="btn-secondary"><FileUp className="h-4 w-4" /> 导入CSV</Link>
-                <Link href="/settings/import" className="btn-secondary"><Settings className="h-4 w-4" /> 设置</Link>
+                <Link href="/import" className="btn-secondary"><FileUp className="h-4 w-4" /> 导入CSV</Link>
+                <Link href="/import" className="btn-secondary"><Settings className="h-4 w-4" /> 设置</Link>
               </nav>
               <ThemeToggle />
             </header>

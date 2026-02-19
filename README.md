@@ -1,11 +1,10 @@
-# Trader Notes v1.1 - Pepperstone CSV 订单历史导入
+# Trader Notes v1.1 - Pepperstone CSV 订单历史导入（纯 JSON 本地库）
 
-本版本仅围绕 Pepperstone 订单历史 CSV（固定字段）构建。
-已移除旧版复盘字段（如 notes/tags/takeProfits/partialExits/assetClass 等）。
+本版本彻底移除 sql.js/wasm，采用纯 Node JSON 文件数据库，避免 webpack wasm 编译问题，满足 Windows 零坑本地运行。
 
 ## 技术栈
 - Next.js + TypeScript + Tailwind
-- sql.js (WASM SQLite，Windows 免原生编译)
+- 纯 Node `fs` JSON 落盘（`./data/orders.json`）
 - framer-motion + lucide-react + next-themes
 
 ## Node 版本
@@ -20,8 +19,15 @@ pnpm dev
 ```
 
 ## 数据文件
-- `./data/trader-notes.sqlite`
-- 重置：删除该文件后重新执行 `pnpm db:init && pnpm db:seed`
+- `./data/orders.json`
+- 结构：
+```json
+{
+  "orders": [],
+  "meta": { "lastImportAt": null, "version": 1 }
+}
+```
+- 重置：删除 `data/orders.json` 后重新执行 `pnpm db:init && pnpm db:seed`
 
 ## Pepperstone CSV 固定列
 1. 商品代码
@@ -41,33 +47,29 @@ pnpm dev
 15. 订单编号
 
 ## 导入说明
-- 页面：`/settings/import`
-- 支持：拖拽/选择 CSV、前20行预览、错误统计、错误报告下载(JSON)
+- 页面：`/import`（同时保留 `/settings/import`）
+- 支持：上传 CSV、前 20 行预览、错误统计、错误报告下载(JSON)
 - 导入模式：
   - 导入全部状态（默认）
   - 仅导入已成交
 - 重复策略：
-  - Skip duplicates（默认）
-  - Upsert（按 orderId 更新）
-
-## 页面
-- `/` Dashboard（订单统计 + Profit 时间序列 + 分布 + Symbol 聚合）
-- `/orders` 订单列表（筛选：symbol/status/side/date range）
-- `/settings/import` CSV 导入
+  - 跳过重复（默认）
+  - 重复则更新（upsert）
 
 ## API
-- `GET /api/orders`
 - `POST /api/import`
+- `GET /api/orders`（支持 q/status/side/start/end/sort/page/pageSize）
 - `GET /api/dashboard/summary`
 
 ## 字段说明（仅保留 CSV 对应）
-表：`history_orders`
-- id（内部 UUID）
+每条订单：
 - symbol, side, orderType
 - volume, filledVolume
 - limitPrice, stopLossPrice, avgFillPrice
 - status
-- updatedAtText, parsedUpdatedAt（用于排序/筛选）
+- updatedAtText
 - profit, grossProfit, swap, commission
 - orderId
-- importedAt, createdAt
+
+内部字段（仅用于系统功能）：
+- id, importedAt, parsedUpdatedAt

@@ -15,9 +15,23 @@ type Summary = {
   totalSwap: number;
   totalCommission: number;
   profitSeries: Array<{ time: string; value: number }>;
-  symbolAgg: Array<{ symbol: string; profit: number }>;
+  topSymbolsByProfit: Array<{ symbol: string; profit: number }>;
   profitBuckets: Array<{ from: number; to: number; count: number }>;
-  winRule: string;
+  meta: { winRateRule: string };
+};
+
+const fallback: Summary = {
+  totalOrders: 0,
+  filledOrders: 0,
+  totalProfit: 0,
+  winRate: 0,
+  averageProfit: 0,
+  totalSwap: 0,
+  totalCommission: 0,
+  profitSeries: [],
+  topSymbolsByProfit: [],
+  profitBuckets: [],
+  meta: { winRateRule: '仅统计已成交且 Profit>0 为胜，Profit<0 为负，Profit=0 不计入胜率' },
 };
 
 export default function DashboardPage() {
@@ -28,7 +42,7 @@ export default function DashboardPage() {
       .then((res) => setData(res.data))
       .catch((e) => {
         console.log('dashboard error', e);
-        setData({ totalOrders: 0, filledOrders: 0, totalProfit: 0, winRate: 0, averageProfit: 0, totalSwap: 0, totalCommission: 0, profitSeries: [], symbolAgg: [], profitBuckets: [], winRule: '胜率按已成交且 Profit>0 记胜；Profit<=0 记负。' });
+        setData(fallback);
       });
   }, []);
 
@@ -44,11 +58,11 @@ export default function DashboardPage() {
       <StatCard title="总 Swap" value={data.totalSwap.toFixed(2)} numeric />
       <StatCard title="总 Commission" value={data.totalCommission.toFixed(2)} numeric />
     </section>
-    <GlassCard className="p-4"><p className="text-sm text-muted">{data.winRule}</p></GlassCard>
+    <GlassCard className="p-4"><p className="text-sm text-muted">{data.meta.winRateRule}</p></GlassCard>
     <div className="grid gap-4 lg:grid-cols-2">
       <GlassCard className="p-4"><h3 className="mb-3 font-semibold">Profit 时间序列（累计）</h3>{data.profitSeries.length===0?<p className="text-sm text-muted">暂无数据</p>:data.profitSeries.slice(-20).map((p,i)=><div key={i} className="flex justify-between text-sm"><span>{String(p.time).slice(0,19)}</span><span>{p.value.toFixed(2)}</span></div>)}</GlassCard>
       <GlassCard className="p-4"><h3 className="mb-3 font-semibold">Profit 分布</h3>{data.profitBuckets.length===0?<p className="text-sm text-muted">暂无数据</p>:data.profitBuckets.map((b,i)=><div key={i} className="flex justify-between text-sm"><span>{b.from.toFixed(1)} ~ {b.to.toFixed(1)}</span><span>{b.count}</span></div>)}</GlassCard>
     </div>
-    <GlassCard className="p-4"><h3 className="mb-3 font-semibold">品种 Profit 排行</h3>{data.symbolAgg.length===0?<p className="text-sm text-muted">暂无数据</p>:data.symbolAgg.map((s)=><div key={s.symbol} className="flex justify-between text-sm"><span>{s.symbol}</span><span>{s.profit.toFixed(2)}</span></div>)}</GlassCard>
+    <GlassCard className="p-4"><h3 className="mb-3 font-semibold">品种 Profit 排行</h3>{data.topSymbolsByProfit.length===0?<p className="text-sm text-muted">暂无数据</p>:data.topSymbolsByProfit.map((s)=><div key={s.symbol} className="flex justify-between text-sm"><span>{s.symbol}</span><span>{s.profit.toFixed(2)}</span></div>)}</GlassCard>
   </div></MotionLayout>;
 }
