@@ -6,52 +6,32 @@ let SQL: SqlJsStatic | null = null;
 let db: Database | null = null;
 
 const schemaSql = `
-CREATE TABLE IF NOT EXISTS trades (
+CREATE TABLE IF NOT EXISTS history_orders (
   id TEXT PRIMARY KEY,
-  assetClass TEXT NOT NULL,
-  symbol TEXT NOT NULL,
-  side TEXT NOT NULL,
-  entryTime TEXT NOT NULL,
-  closeTime TEXT,
-  entryPrice REAL,
-  stopLoss REAL,
-  closePrice REAL,
-  qty REAL,
-  notional REAL,
-  fee REAL,
-  slippage REAL,
-  notes TEXT,
-  extra TEXT,
-  createdAt TEXT NOT NULL,
-  updatedAt TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS take_profits (
-  id TEXT PRIMARY KEY,
-  tradeId TEXT NOT NULL,
-  price REAL NOT NULL,
-  label TEXT NOT NULL,
+  symbol TEXT,
+  side TEXT,
+  orderType TEXT,
+  volume REAL,
+  filledVolume REAL,
+  limitPrice REAL,
+  stopLossPrice REAL,
+  avgFillPrice REAL,
+  status TEXT,
+  updatedAtText TEXT,
+  parsedUpdatedAt TEXT,
+  profit REAL,
+  grossProfit REAL,
+  swap REAL,
+  commission REAL,
+  orderId TEXT UNIQUE,
+  importedAt TEXT NOT NULL,
   createdAt TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS partial_exits (
-  id TEXT PRIMARY KEY,
-  tradeId TEXT NOT NULL,
-  price REAL NOT NULL,
-  qtyPercent REAL NOT NULL,
-  time TEXT,
-  createdAt TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS trade_tags (
-  id TEXT PRIMARY KEY,
-  tradeId TEXT NOT NULL,
-  tag TEXT NOT NULL
 );
 `;
 
 async function ensureSql() {
   if (SQL) return SQL;
-  SQL = await initSqlJs({
-    locateFile: () => path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm'),
-  });
+  SQL = await initSqlJs({ locateFile: () => path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm') });
   return SQL;
 }
 
@@ -67,11 +47,5 @@ export async function getDb() {
 
 export async function persistDb() {
   if (!db) return;
-  const exported = db.export();
-  await queueWriteDbFile(exported);
-}
-
-export async function resetDb() {
-  db = null;
-  await getDb();
+  await queueWriteDbFile(db.export());
 }

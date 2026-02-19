@@ -5,5 +5,4 @@ async function main() {
   await persistDb();
   console.log('Database initialized at data/trader-notes.sqlite');
 }
-
 main();
