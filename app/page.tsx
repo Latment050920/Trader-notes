@@ -52,11 +52,11 @@ export default function DashboardPage() {
     <MotionLayout>
       <div className="space-y-5">
         <section className="grid gap-3 md:grid-cols-5">
-          <StatCard title="Total R" value={summary.all.totalR.toFixed(2)} />
-          <StatCard title="Win Rate" value={`${summary.all.winRate.toFixed(1)}%`} />
-          <StatCard title="Avg R" value={summary.all.avgR.toFixed(2)} />
-          <StatCard title="Trades" value={`${summary.all.total}`} />
-          <StatCard title="Profit Factor" value={(Math.max(summary.all.totalR, 0.01) / Math.max(1, summary.all.total - summary.all.winRate / 100)).toFixed(2)} />
+          <StatCard title="Total R" value={summary.all.totalR.toFixed(2)} numeric />
+          <StatCard title="Win Rate" value={`${summary.all.winRate.toFixed(1)}%`} numeric />
+          <StatCard title="Avg R" value={summary.all.avgR.toFixed(2)} numeric />
+          <StatCard title="Trades" value={`${summary.all.total}`} numeric />
+          <StatCard title="Profit Factor" value={(Math.max(summary.all.totalR, 0.01) / Math.max(1, summary.all.total - summary.all.winRate / 100)).toFixed(2)} numeric />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           <GlassCard className="p-4 lg:col-span-2">
             <h3 className="mb-3 font-semibold">最近交易</h3>
             <div className="space-y-2">
-              {trades.slice(0, 6).map((t) => (
+              {trades.length === 0 ? <p className="text-sm text-muted">暂无交易，先去新增一笔 Demo 交易。</p> : trades.slice(0, 6).map((t) => (
                 <Link href={`/trades/${t.id}`} key={t.id} className="block rounded-xl border border-border/60 bg-white/5 px-3 py-2 text-sm hover:border-cyan-400/50 hover:bg-white/10">
                   <div className="flex items-center justify-between"><span>{t.assetClass} · {t.symbol}</span><span>{t.side}</span></div>
                 </Link>

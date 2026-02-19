@@ -28,6 +28,8 @@ export default function TradesPage() {
   const [q, setQ] = useState('');
   const [assetClass, setAssetClass] = useState('All');
   const [side, setSide] = useState<'All' | 'Long' | 'Short'>('All');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -58,8 +60,10 @@ export default function TradesPage() {
     const hitQ = !q || [t.symbol, t.notes || '', ...(t.tags || [])].join(' ').toLowerCase().includes(q.toLowerCase());
     const hitAsset = assetClass === 'All' || t.assetClass === assetClass;
     const hitSide = side === 'All' || t.side === side;
-    return hitQ && hitAsset && hitSide;
-  }), [rows, q, assetClass, side]);
+    const hitFrom = !from || String(t.entryTime).slice(0, 10) >= from;
+    const hitTo = !to || String(t.entryTime).slice(0, 10) <= to;
+    return hitQ && hitAsset && hitSide && hitFrom && hitTo;
+  }), [rows, q, assetClass, side, from, to]);
 
   if (!rows) return <SkeletonTable />;
 
@@ -72,6 +76,10 @@ export default function TradesPage() {
             <Segmented options={classes} value={assetClass} onChange={setAssetClass} />
             <Segmented options={['All', 'Long', 'Short']} value={side} onChange={(v)=>setSide(v as any)} />
           </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <input className="input" type="date" value={from} onChange={(e)=>setFrom(e.target.value)} />
+            <input className="input" type="date" value={to} onChange={(e)=>setTo(e.target.value)} />
+          </div>
           {error ? <p className="text-xs text-rose-300">{error}</p> : null}
         </GlassCard>
 
@@ -80,7 +88,9 @@ export default function TradesPage() {
             <table className="min-w-full text-sm">
               <thead className="text-left text-muted"><tr><th className="p-3">Time</th><th>Asset</th><th>Symbol</th><th>Side</th><th>R</th><th>Tags</th><th /></tr></thead>
               <tbody>
-                {trades.map((t) => (
+                {trades.length === 0 ? (
+                  <tr><td className="p-4 text-sm text-muted" colSpan={7}>暂无交易，尝试放宽筛选条件。</td></tr>
+                ) : trades.map((t) => (
                   <motion.tr layout key={t.id} className="rounded-xl border-t border-border/50 hover:bg-white/5">
                     <td className="p-3">{t.entryTime}</td><td>{t.assetClass}</td><td>{t.symbol}</td><td>{t.side}</td><td>{(computeTotalR(t) ?? NaN).toFixed?.(2) || 'N/A'}</td><td>{(t.tags || []).join(', ')}</td><td><Link className="btn-secondary" href={`/trades/${t.id}`}>Detail</Link></td>
                   </motion.tr>
@@ -91,7 +101,7 @@ export default function TradesPage() {
         </div>
 
         <div className="grid gap-3 md:hidden">
-          {trades.map((t) => (
+          {trades.length === 0 ? <GlassCard className="p-4 text-sm text-muted">暂无交易，尝试放宽筛选条件。</GlassCard> : trades.map((t) => (
             <GlassCard key={t.id} className="p-3">
               <div className="flex justify-between text-sm"><span>{t.assetClass} · {t.symbol}</span><span>{t.side}</span></div>
               <p className="mt-2 text-xs text-muted">{t.entryTime}</p>
