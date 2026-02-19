@@ -15,7 +15,14 @@ export default function OrdersPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
-  useEffect(() => { fetchJson<Order[]>('/api/orders').then(setRows).catch(() => setRows([])); }, []);
+  useEffect(() => {
+    fetchJson<{ ok: boolean; data: Order[] }>('/api/orders')
+      .then((res) => setRows(res.data || []))
+      .catch((e) => {
+        console.log('orders error', e);
+        setRows([]);
+      });
+  }, []);
 
   const filtered = useMemo(() => rows.filter((r) => {
     if (symbol && !String(r.symbol).toLowerCase().includes(symbol.toLowerCase())) return false;
@@ -29,7 +36,7 @@ export default function OrdersPage() {
 
   return <MotionLayout><div className="space-y-4">
     <GlassCard className="grid gap-2 p-4 md:grid-cols-5">
-      <input className="input" placeholder="symbol" value={symbol} onChange={(e)=>setSymbol(e.target.value)} />
+      <input className="input" placeholder="商品代码" value={symbol} onChange={(e)=>setSymbol(e.target.value)} />
       <select className="input" value={status} onChange={(e)=>setStatus(e.target.value)}><option>全部</option><option>已成交</option><option>已取消</option></select>
       <select className="input" value={side} onChange={(e)=>setSide(e.target.value)}><option>全部</option><option>买入</option><option>卖出</option></select>
       <input className="input" type="date" value={from} onChange={(e)=>setFrom(e.target.value)} />
@@ -38,7 +45,7 @@ export default function OrdersPage() {
 
     <div className="hidden md:block glass-card overflow-auto p-2">
       <table className="min-w-full text-sm">
-        <thead><tr><th className="p-2">symbol</th><th>side</th><th>type</th><th>volume</th><th>filled</th><th>avg</th><th>sl</th><th>limit</th><th>status</th><th>updatedAt</th><th>profit</th><th>swap</th><th>commission</th><th>orderId</th></tr></thead>
+        <thead><tr><th className="p-2">商品代码</th><th>买/卖</th><th>类型</th><th>数量</th><th>已成交</th><th>成交均价</th><th>止损价</th><th>限价</th><th>状态</th><th>更新时间</th><th>Profit</th><th>Swap</th><th>Commission</th><th>订单编号</th></tr></thead>
         <tbody>{filtered.map((r)=> <tr key={r.id} className="border-t border-border/40"><td className="p-2">{r.symbol}</td><td>{r.side}</td><td>{r.orderType}</td><td>{r.volume ?? '-'}</td><td>{r.filledVolume ?? '-'}</td><td>{r.avgFillPrice ?? '-'}</td><td>{r.stopLossPrice ?? '-'}</td><td>{r.limitPrice ?? '-'}</td><td>{r.status}</td><td>{r.updatedAtText}</td><td>{r.profit ?? '-'}</td><td>{r.swap ?? '-'}</td><td>{r.commission ?? '-'}</td><td>{r.orderId}</td></tr>)}</tbody>
       </table>
     </div>

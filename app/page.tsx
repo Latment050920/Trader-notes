@@ -24,10 +24,15 @@ export default function DashboardPage() {
   const [data, setData] = useState<Summary | null>(null);
 
   useEffect(() => {
-    fetchJson<Summary>('/api/dashboard/summary').then(setData).catch(() => setData({ totalOrders: 0, filledOrders: 0, totalProfit: 0, winRate: 0, averageProfit: 0, totalSwap: 0, totalCommission: 0, profitSeries: [], symbolAgg: [], profitBuckets: [], winRule: '胜率按已成交且 Profit>0 记胜；Profit<=0 记负。' }));
+    fetchJson<{ ok: boolean; data: Summary }>('/api/dashboard/summary')
+      .then((res) => setData(res.data))
+      .catch((e) => {
+        console.log('dashboard error', e);
+        setData({ totalOrders: 0, filledOrders: 0, totalProfit: 0, winRate: 0, averageProfit: 0, totalSwap: 0, totalCommission: 0, profitSeries: [], symbolAgg: [], profitBuckets: [], winRule: '胜率按已成交且 Profit>0 记胜；Profit<=0 记负。' });
+      });
   }, []);
 
-  if (!data) return <div className="glass-card p-4">Loading...</div>;
+  if (!data) return <div className="glass-card p-4">加载中...</div>;
 
   return <MotionLayout><div className="space-y-4">
     <section className="grid gap-3 md:grid-cols-4">
@@ -44,6 +49,6 @@ export default function DashboardPage() {
       <GlassCard className="p-4"><h3 className="mb-3 font-semibold">Profit 时间序列（累计）</h3>{data.profitSeries.length===0?<p className="text-sm text-muted">暂无数据</p>:data.profitSeries.slice(-20).map((p,i)=><div key={i} className="flex justify-between text-sm"><span>{String(p.time).slice(0,19)}</span><span>{p.value.toFixed(2)}</span></div>)}</GlassCard>
       <GlassCard className="p-4"><h3 className="mb-3 font-semibold">Profit 分布</h3>{data.profitBuckets.length===0?<p className="text-sm text-muted">暂无数据</p>:data.profitBuckets.map((b,i)=><div key={i} className="flex justify-between text-sm"><span>{b.from.toFixed(1)} ~ {b.to.toFixed(1)}</span><span>{b.count}</span></div>)}</GlassCard>
     </div>
-    <GlassCard className="p-4"><h3 className="mb-3 font-semibold">Symbol Top Profit</h3>{data.symbolAgg.length===0?<p className="text-sm text-muted">暂无数据</p>:data.symbolAgg.map((s)=><div key={s.symbol} className="flex justify-between text-sm"><span>{s.symbol}</span><span>{s.profit.toFixed(2)}</span></div>)}</GlassCard>
+    <GlassCard className="p-4"><h3 className="mb-3 font-semibold">品种 Profit 排行</h3>{data.symbolAgg.length===0?<p className="text-sm text-muted">暂无数据</p>:data.symbolAgg.map((s)=><div key={s.symbol} className="flex justify-between text-sm"><span>{s.symbol}</span><span>{s.profit.toFixed(2)}</span></div>)}</GlassCard>
   </div></MotionLayout>;
 }
