@@ -12,14 +12,46 @@ import { SkeletonTable } from '@/components/ui/Skeletons';
 
 const classes = ['All', 'Stock', 'CFD', 'Futures', 'Fund', 'Options'];
 
+async function safeJson<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!res.ok || !text.trim()) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function TradesPage() {
   const [rows, setRows] = useState<any[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [assetClass, setAssetClass] = useState('All');
   const [side, setSide] = useState<'All' | 'Long' | 'Short'>('All');
 
   useEffect(() => {
-    fetch('/api/trades').then((r) => r.json()).then(setRows);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/trades', { cache: 'no-store' });
+        const data = await safeJson<any[]>(res);
+        if (cancelled) return;
+        if (!data) {
+          setRows([]);
+          setError('数据加载失败，请稍后重试。');
+          return;
+        }
+        setRows(data);
+      } catch {
+        if (!cancelled) {
+          setRows([]);
+          setError('网络异常，无法加载交易列表。');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const trades = useMemo(() => (rows || []).filter((t) => {
@@ -40,6 +72,7 @@ export default function TradesPage() {
             <Segmented options={classes} value={assetClass} onChange={setAssetClass} />
             <Segmented options={['All', 'Long', 'Short']} value={side} onChange={(v)=>setSide(v as any)} />
           </div>
+          {error ? <p className="text-xs text-rose-300">{error}</p> : null}
         </GlassCard>
 
         <div className="hidden md:block">
