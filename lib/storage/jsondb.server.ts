@@ -1,4 +1,6 @@
-import 'server-only';
+if (typeof window !== 'undefined') {
+  throw new Error('jsondb is server-only and cannot run in browser');
+}
 
 import fs from 'node:fs';
 import path from 'node:path';

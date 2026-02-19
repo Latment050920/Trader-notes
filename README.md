@@ -1,16 +1,18 @@
-# Trader Notes v1.2 - Pepperstone 订单历史 + 账户参数与资金流水
+# Trader Notes v1.2 - Pepperstone 订单历史可视化平台
 
-本版本采用**纯 Node JSON 文件数据库**（无 sql.js/wasm/原生编译依赖），可在 Windows 本地快速运行。
+本版本保持**纯 Node JSON 文件数据库**（无 sql.js / wasm / 原生编译依赖），并升级 Dashboard 图表分析能力。目标是 Windows 本地 `pnpm install + pnpm dev` 低门槛运行。
 
 ## 技术栈
-- Next.js + TypeScript + Tailwind
+- Next.js + TypeScript + TailwindCSS
 - 纯 Node `fs` JSON 落盘（`./data/orders.json`）
-- framer-motion + lucide-react + next-themes
+- Framer Motion（微动效）
+- Recharts（图表渲染）
+- next-themes（主题）
 
 ## Node 版本
 - 推荐 Node 20 LTS（18/22 也可）
 
-## 启动
+## 启动与初始化
 ```bash
 pnpm install
 pnpm db:init
@@ -18,8 +20,12 @@ pnpm db:seed
 pnpm dev
 ```
 
+### db:init 说明
+- `pnpm db:init` 仅负责创建/修复 `data/orders.json` 基础结构。
+- 相关存储文件已改为 `lib/storage/jsondb.server.ts`（不再依赖 `server-only` 包），因此可在 `tsx scripts/init-db.ts` 的纯 Node 环境稳定运行。
+
 ## 数据文件
-- `./data/orders.json`
+- 文件：`./data/orders.json`
 - 结构：
 ```json
 {
@@ -33,9 +39,8 @@ pnpm dev
   "meta": { "lastImportAt": null, "version": 2 }
 }
 ```
-- 重置：删除 `data/orders.json` 后重新执行 `pnpm db:init && pnpm db:seed`
 
-## Pepperstone CSV 固定列
+## Pepperstone CSV 固定列（15列）
 1. 商品代码
 2. 买/卖
 3. 类型
@@ -53,55 +58,36 @@ pnpm dev
 15. 订单编号
 
 ## 导入说明
-- 页面：`/import`（同时保留 `/settings/import`）
-- 支持：上传 CSV、前 20 行预览、错误统计、错误报告下载(JSON)
-- 导入模式：
-  - 导入全部状态（默认）
-  - 仅导入已成交
-- 重复策略：
-  - 跳过重复（默认）
-  - 重复则更新（upsert）
+- 页面：`/import`（别名到 `/settings/import`）
+- 支持：上传 CSV、预览、逐行容错、错误报告下载
+- 导入模式：全部状态 / 仅已成交
+- 重复策略：跳过重复（默认）/ upsert
 
-## v1.2 新增：账户参数与资金流水
-- 账户参数：
-  - 初始本金（initialEquity）
-  - 年化无风险利率（riskFreeRateAnnual）
-  - 年化交易日数（tradingDaysPerYear）
-- 资金流水：入金/出金、删除、最近流水列表
-- Dashboard 指标（中文展示）：
-  - 夏普比率（Sharpe）
-  - 索提诺比率（Sortino）
-  - 最大回撤（Max Drawdown）
-  - 年化收益率（CAGR）
-  - 卡玛比率（Calmar）
-  - 盈利因子（Profit Factor）
-  - 期望值（Expectancy）
-  - 最大连亏/最大连胜
+## Dashboard 图表（v1.2）
+- 权益曲线（按单/按日切换，支持 Brush）
+- 每单收益分布（正负分色）
+- 滚动指标（滚动胜率 / 滚动平均收益 / 滚动波动）
+- 收益分布直方图
+- Top 商品代码收益条形图
+- 周几 × 小时热力图
 
 ## API
 - `POST /api/import`
-- `GET /api/orders`（支持 q/status/side/start/end/sort/page/pageSize）
+- `GET /api/orders`（`q/status/side/start/end/sort/page/pageSize`）
 - `GET /api/dashboard/metrics`
-- `GET /api/dashboard/summary`（兼容别名）
+- `GET /api/dashboard/summary`（summary + charts 聚合返回）
+- `GET /api/dashboard/charts`（图表专用，支持缓存）
+  - Query: `start/end/symbol/status/rollingWindow`
 - `GET/PUT /api/settings`
 - `GET/POST/DELETE /api/cashflows`
 
 ## 指标口径（核心）
-- 每单净收益 netPnL = Profit + Swap - Commission
-- 日收益率 r[d] = dailyNetPnL[d] / equityStart[d]（不含入金出金）
-- 夏普：mean(excess) / std(excess, n-1) * sqrt(tradingDaysPerYear)
-- 样本 < 20：夏普/索提诺显示不可用（样本不足）
-- 胜率定义：净收益>0 为胜，净收益<0 为负，净收益=0 不计入
+- 每单净收益：`netPnL = Profit + Swap - Commission`
+- 日收益率：`r[d] = dailyNetPnL[d] / equityStart[d]`（不含入金/出金）
+- 夏普：`mean(excess) / std(excess, n-1) * sqrt(tradingDaysPerYear)`
+- 样本 `<20`：夏普/索提诺显示“不可用（样本不足）”
 
-## 字段说明（仅保留 CSV 对应 + 必要内部字段）
-订单字段：
-- symbol, side, orderType
-- volume, filledVolume
-- limitPrice, stopLossPrice, avgFillPrice
-- status
-- updatedAtText
-- profit, grossProfit, swap, commission
-- orderId
-
-内部字段（用于系统/统计）：
-- id, importedAt, parsedUpdatedAt
+## 字段约束
+仅保留 CSV 字段 + 必要内部字段：
+- CSV: `symbol, side, orderType, volume, filledVolume, limitPrice, stopLossPrice, avgFillPrice, status, updatedAtText, profit, grossProfit, swap, commission, orderId`
+- 内部: `id, importedAt, parsedUpdatedAt`

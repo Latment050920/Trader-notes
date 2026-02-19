@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import dayjs from 'dayjs';
 import { AccountSettings, Cashflow, DuplicateStrategy, HistoryOrder, ImportErrorRow } from '@/types/order';
-import { OrderRow, readDb, writeDbQueued } from '@/lib/storage/jsondb';
+import { OrderRow, readDb, writeDbQueued } from '@/lib/storage/jsondb.server';
 
 function toHistoryOrder(r: OrderRow): HistoryOrder {
   return {
@@ -173,30 +173,96 @@ function sampleStd(values: number[]) {
   return Math.sqrt(variance);
 }
 
-export async function dashboardMetrics() {
+type Prepared = {
+  settings: AccountSettings;
+  orders: Array<{ date: string; net: number; symbol: string; side: string; orderType: string; status: string; ts: string }>;
+  dailyNetMap: Record<string, number>;
+  dailyCfMap: Record<string, number>;
+  dates: string[];
+};
+
+function prepareFilteredDataset(filters?: { start?: string; end?: string; symbol?: string; status?: string }): Prepared {
   const db = readDb();
   const settings = db.settings;
-  const filled = db.orders.filter((o) => (o.status || '').includes('成交'));
+  const statusFilter = filters?.status && filters.status !== '全部' ? filters.status : '已成交';
 
-  const orderNet = filled
-    .map((o) => ({
-      date: String(o.parsedUpdatedAt || o.updatedAtText || o.importedAt).slice(0, 10),
-      net: (o.profit || 0) + (o.swap || 0) - (o.commission || 0),
-      symbol: o.symbol,
-      time: o.parsedUpdatedAt || o.updatedAtText || o.importedAt,
-    }))
-    .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+  let rows = db.orders.slice();
+  if (filters?.symbol && filters.symbol !== 'ALL') rows = rows.filter((o) => o.symbol === filters.symbol);
+  if (statusFilter === '已成交') rows = rows.filter((o) => (o.status || '').includes('成交'));
+  else if (statusFilter) rows = rows.filter((o) => o.status === statusFilter);
+
+  const orders = rows
+    .map((o) => {
+      const ts = o.parsedUpdatedAt || o.updatedAtText || o.importedAt;
+      const date = String(ts).slice(0, 10);
+      return {
+        date,
+        net: (o.profit || 0) + (o.swap || 0) - (o.commission || 0),
+        symbol: o.symbol,
+        side: o.side,
+        orderType: o.orderType,
+        status: o.status,
+        ts,
+      };
+    })
+    .filter((o) => {
+      if (filters?.start && o.date < filters.start) return false;
+      if (filters?.end && o.date > filters.end) return false;
+      return true;
+    })
+    .sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
 
   const dailyNetMap: Record<string, number> = {};
-  for (const x of orderNet) dailyNetMap[x.date] = (dailyNetMap[x.date] || 0) + x.net;
+  for (const x of orders) dailyNetMap[x.date] = (dailyNetMap[x.date] || 0) + x.net;
 
   const dailyCfMap: Record<string, number> = {};
   for (const c of db.cashflows) {
     const d = String(c.dateTime).slice(0, 10);
+    if (filters?.start && d < filters.start) continue;
+    if (filters?.end && d > filters.end) continue;
     dailyCfMap[d] = (dailyCfMap[d] || 0) + c.amount;
   }
 
   const dates = Array.from(new Set([...Object.keys(dailyNetMap), ...Object.keys(dailyCfMap)])).sort();
+  return { settings, orders, dailyNetMap, dailyCfMap, dates };
+}
+
+function buildRollingSeries(values: number[], window: number) {
+  const win: number[] = [];
+  const lose: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i];
+    win.push(values[i] > 0 ? 1 : 0);
+    lose.push(values[i]);
+    if (i >= window) {
+      sum -= values[i - window];
+    }
+  }
+
+  let rollingWin = 0;
+  let rollingLoss = 0;
+  const out: Array<{ i: number; rollingWinRate: number; rollingAvgProfit: number; rollingStdProfit: number }> = [];
+  for (let i = 0; i < values.length; i++) {
+    rollingWin += win[i];
+    rollingLoss += values[i];
+    if (i >= window) {
+      rollingWin -= win[i - window];
+      rollingLoss -= values[i - window];
+    }
+    const size = Math.min(window, i + 1);
+    const avg = rollingLoss / size;
+    let varAcc = 0;
+    for (let j = i - size + 1; j <= i; j++) varAcc += (values[j] - avg) ** 2;
+    const std = size > 1 ? Math.sqrt(varAcc / (size - 1)) : 0;
+    out.push({ i, rollingWinRate: rollingWin / size, rollingAvgProfit: avg, rollingStdProfit: std });
+  }
+  return out;
+}
+
+export async function dashboardMetrics(filters?: { start?: string; end?: string; symbol?: string; status?: string }) {
+  const { settings, orders, dailyNetMap, dailyCfMap, dates } = prepareFilteredDataset(filters);
+
   let prevEquity = settings.initialEquity;
   let peak = prevEquity;
   let maxDD = 0;
@@ -241,15 +307,15 @@ export async function dashboardMetrics() {
   }
   const calmar = cagr != null && maxDDPct > 0 ? cagr / maxDDPct : null;
 
-  const grossWin = orderNet.reduce((a, b) => a + Math.max(b.net, 0), 0);
-  const grossLoss = orderNet.reduce((a, b) => a + Math.abs(Math.min(b.net, 0)), 0);
+  const grossWin = orders.reduce((a, b) => a + Math.max(b.net, 0), 0);
+  const grossLoss = orders.reduce((a, b) => a + Math.abs(Math.min(b.net, 0)), 0);
   const profitFactor = grossLoss === 0 ? null : grossWin / grossLoss;
-  const expectancy = orderNet.length ? orderNet.reduce((a, b) => a + b.net, 0) / orderNet.length : null;
+  const expectancy = orders.length ? orders.reduce((a, b) => a + b.net, 0) / orders.length : null;
 
-  const streak = calcStreak(orderNet.map((x) => x.net));
+  const streak = calcStreak(orders.map((x) => x.net));
 
   const topSymbolsByProfit = Object.entries(
-    orderNet.reduce((acc: Record<string, number>, o) => {
+    orders.reduce((acc: Record<string, number>, o) => {
       acc[o.symbol] = (acc[o.symbol] || 0) + o.net;
       return acc;
     }, {}),
@@ -277,16 +343,141 @@ export async function dashboardMetrics() {
     },
     series: { equityDaily },
     summary: {
-      totalOrders: db.orders.length,
-      filledOrders: filled.length,
-      totalProfit: orderNet.reduce((a, b) => a + b.net, 0),
-      totalSwap: filled.reduce((a, b) => a + (b.swap || 0), 0),
-      totalCommission: filled.reduce((a, b) => a + (b.commission || 0), 0),
+      totalOrders: orders.length,
+      filledOrders: orders.length,
+      totalProfit: orders.reduce((a, b) => a + b.net, 0),
+      totalSwap: 0,
+      totalCommission: 0,
       topSymbolsByProfit,
     },
     meta: {
       winDefinition: '净收益>0 为胜，净收益<0 为负，净收益=0 不计入胜率',
       returnDefinition: '当日净收益 / 当日初始权益（不含入金出金）',
+    },
+  };
+}
+
+function aggregateBreakdown(orders: Prepared['orders'], key: 'symbol' | 'side' | 'orderType') {
+  const map = new Map<string, { key: string; count: number; sumProfit: number; win: number }>();
+  for (const o of orders) {
+    const k = o[key] || '未知';
+    const row = map.get(k) || { key: k, count: 0, sumProfit: 0, win: 0 };
+    row.count += 1;
+    row.sumProfit += o.net;
+    if (o.net > 0) row.win += 1;
+    map.set(k, row);
+  }
+  return Array.from(map.values())
+    .map((x) => ({ ...x, avgProfit: x.count ? x.sumProfit / x.count : 0, winRate: x.count ? x.win / x.count : 0 }))
+    .sort((a, b) => b.sumProfit - a.sumProfit);
+}
+
+function histogram(values: number[], bins = 20) {
+  if (!values.length) return [] as Array<{ bin: string; count: number }>;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const width = max === min ? 1 : (max - min) / bins;
+  const counts = Array.from({ length: bins }, () => 0);
+  for (const v of values) {
+    const idx = Math.min(bins - 1, Math.floor((v - min) / width));
+    counts[idx] += 1;
+  }
+  return counts.map((count, i) => ({ bin: `${(min + i * width).toFixed(2)}~${(min + (i + 1) * width).toFixed(2)}`, count }));
+}
+
+function quantile(sorted: number[], q: number) {
+  if (!sorted.length) return null;
+  const pos = (sorted.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  if (sorted[base + 1] !== undefined) return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+  return sorted[base];
+}
+
+export async function dashboardCharts(filters: { start?: string; end?: string; symbol?: string; status?: string; rollingWindow?: number }) {
+  const { orders, dates, dailyNetMap } = prepareFilteredDataset(filters);
+  const rollingWindow = Math.max(10, Math.min(100, Number(filters.rollingWindow || 20)));
+
+  let cum = 0;
+  const equityCurve = orders.map((o) => {
+    cum += o.net;
+    return { t: o.ts, v: Number(cum.toFixed(6)) };
+  });
+
+  let dayCum = 0;
+  const equityCurveDaily = dates.map((d) => {
+    dayCum += dailyNetMap[d] || 0;
+    return { t: d, v: Number(dayCum.toFixed(6)) };
+  });
+
+  const profitPerTrade = orders.map((o) => ({ t: o.ts, v: o.net, symbol: o.symbol }));
+  const rollingBase = buildRollingSeries(orders.map((o) => o.net), rollingWindow);
+  const rollingWinRate = rollingBase.map((x, idx) => ({ t: orders[idx]?.ts || String(idx), v: x.rollingWinRate }));
+  const rollingAvgProfit = rollingBase.map((x, idx) => ({ t: orders[idx]?.ts || String(idx), v: x.rollingAvgProfit }));
+  const rollingStdProfit = rollingBase.map((x, idx) => ({ t: orders[idx]?.ts || String(idx), v: x.rollingStdProfit }));
+
+  const values = orders.map((o) => o.net);
+  const sortedVals = values.slice().sort((a, b) => a - b);
+
+  const byStatusMap: Record<string, number> = {};
+  for (const o of orders) byStatusMap[o.status] = (byStatusMap[o.status] || 0) + 1;
+
+  const dowHourMap = new Map<string, { dow: number; hour: number; count: number; sumProfit: number }>();
+  for (const o of orders) {
+    const t = dayjs(o.ts);
+    const dow = t.day();
+    const hour = t.hour();
+    const key = `${dow}-${hour}`;
+    const row = dowHourMap.get(key) || { dow, hour, count: 0, sumProfit: 0 };
+    row.count += 1;
+    row.sumProfit += o.net;
+    dowHourMap.set(key, row);
+  }
+
+  const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const std = values.length > 1 ? sampleStd(values) || 0 : 0;
+  const median = quantile(sortedVals, 0.5);
+
+  return {
+    ok: true,
+    meta: {
+      winRateDefinition: '净收益>0 为胜，净收益<=0 不计胜',
+      timezone: 'local',
+      rollingWindow,
+    },
+    kpis: {
+      totalOrders: orders.length,
+      totalProfit: values.reduce((a, b) => a + b, 0),
+      avgProfit: avg,
+      medianProfit: median,
+      stdProfit: std,
+    },
+    series: {
+      equityCurve,
+      equityCurveDaily,
+      profitPerTrade,
+      rollingWinRate,
+      rollingAvgProfit,
+      rollingStdProfit,
+    },
+    dist: {
+      profitHistogram: histogram(values, 20),
+      profitBox: {
+        min: sortedVals[0] ?? null,
+        q1: quantile(sortedVals, 0.25),
+        median,
+        q3: quantile(sortedVals, 0.75),
+        max: sortedVals[sortedVals.length - 1] ?? null,
+      },
+    },
+    breakdown: {
+      bySymbol: aggregateBreakdown(orders, 'symbol').slice(0, 10),
+      bySide: aggregateBreakdown(orders, 'side'),
+      byType: aggregateBreakdown(orders, 'orderType'),
+      byStatus: Object.entries(byStatusMap).map(([key, count]) => ({ key, count })),
+    },
+    heatmap: {
+      dowHour: Array.from(dowHourMap.values()),
     },
   };
 }
