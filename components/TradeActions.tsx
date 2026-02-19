@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 
-export function TradeActions({ id }: { id: number }) {
+export function TradeActions({ id }: { id: string }) {
   const router = useRouter();
   return (
     <div className="flex gap-2">

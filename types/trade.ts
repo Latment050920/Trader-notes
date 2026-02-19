@@ -1,12 +1,12 @@
 export type AssetClass = 'Stock' | 'CFD' | 'Futures' | 'Fund' | 'Options';
 export type Side = 'Long' | 'Short';
 
-export type TakeProfit = { id?: number; price: number; label: string };
-export type PartialExit = { id?: number; price: number; qtyPercent: number; time?: string | null };
+export type TakeProfit = { id?: string; price: number; label: string };
+export type PartialExit = { id?: string; price: number; qtyPercent: number; time?: string | null };
 export type PricePoint = { time: string; value: number };
 
 export type Trade = {
-  id: number;
+  id: string;
   assetClass: AssetClass;
   symbol: string;
   side: Side;

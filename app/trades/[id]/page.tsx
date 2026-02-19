@@ -1,14 +1,21 @@
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { marked } from 'marked';
-import { getTrade } from '@/lib/db';
 import { computeMfeMae, computeTotalR, holdDuration, outcomeLabel } from '@/lib/metrics';
 import { PriceChart } from '@/charts/PriceChart';
 import { TradeActions } from '@/components/TradeActions';
 
-export default async function TradeDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const trade = getTrade(Number(id));
-  if (!trade) return notFound();
+export default function TradeDetailPage() {
+  const params = useParams<{ id: string }>();
+  const [trade, setTrade] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/trades/${params.id}`).then((r) => r.json()).then(setTrade);
+  }, [params.id]);
+
+  if (!trade) return <div className="card p-4">Loading...</div>;
   const r = computeTotalR(trade);
   const { mfe, mae } = computeMfeMae(trade, trade.priceSeries || []);
 
